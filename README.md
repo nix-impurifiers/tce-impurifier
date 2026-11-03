@@ -87,3 +87,21 @@ application/driver upgrades through actual VM reboots, lifecycle persistence,
 GC and boot deselection. Nix/Python are preinstalled and explicitly represented
 by a fixture provider. Application data is mounted persistently by the fixture;
 this is not a full Tiny Core kernel/init boot or Nix-installer test.
+
+## Native payloads and bundled Nix
+
+`makeNativeTcz { name; version; payload; dependencies?; ... }` emits a native
+extension from a producer-prepared tree, without activation scripts or Nix
+requirements. Use ordinary native boot sets for selection. The producer supplies
+a working target layout; this does not relocate binaries. The VM executes a
+static payload in actual Tiny Core userspace without `/nix` or Python, upgrades
+its boot set across a QEMU reboot, then checks removal after another reboot.
+Tiny Core's native mounted-file symlinks are resolved inside the target root.
+
+`makeRuntimeTcz` optionally accepts `bundledNixStore` and `bundledNixNotices`.
+Supply a static ELF client and upstream notices. Bundling omits the default Nix
+dependency; Python remains required. Compatible external clients take precedence,
+explicit `IMPURIFIER_NIX_STORE` disables fallback, and failed mutations are never
+retried through another client. A bundled variant repeats the original boot-set
+lifecycle suite with an incompatible external candidate. Nix provisioning remains
+deferred, and native extensions still do not claim live unloading.

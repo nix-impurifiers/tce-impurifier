@@ -3,6 +3,7 @@
   pkgs,
   impurifier,
   coreSrc,
+  bundled ? false,
 }:
 let
   coreImage = import ./core.nix { inherit pkgs; };
@@ -115,6 +116,7 @@ assert !invalidBoot.success;
         test "$(wc -l < ${closure}/store-paths)" = 1
         touch $out
       '';
+  native-vm = import ./native-vm.nix { inherit pkgs impurifier; };
   unit = impurifier.unit;
   vm = pkgs.testers.runNixOSTest {
     name = "tce-impurifier";
@@ -149,7 +151,12 @@ assert !invalidBoot.success;
           machine.succeed("rm -rf /srv/core; mkdir -p /srv/core; cd /srv/core; cpio -idmu --quiet < ${coreCpio}")
           machine.succeed("mkdir -p /srv/core/nix /srv/core/proc /srv/core/dev /srv/core/sys /srv/core/opt/nix /srv/core/var/lib/tce-impurifier /srv/core/var/lib/tce-tool /srv/core/tmp/builtin /srv/core/tmp/tce/optional /srv/core/home/tc /opt/nix /var/lib/tce-impurifier /var/lib/tce-vm/app")
           machine.succeed("mount --rbind /nix /srv/core/nix; mount -t proc proc /srv/core/proc; mount --rbind /dev /srv/core/dev; mount --rbind /sys /srv/core/sys; mount --bind /opt/nix /srv/core/opt/nix; mount --bind /var/lib/tce-impurifier /srv/core/var/lib/tce-impurifier; mount --bind /var/lib/tce-vm/app /srv/core/var/lib/tce-tool; mount --bind /var/lib/tce-vm/repo /srv/core/tmp/builtin")
-          machine.succeed("echo tc > /srv/core/etc/sysconfig/tcuser; mkdir -p /srv/core/etc/nix; printf 'substituters =\\nbuild-users-group =\\n' > /srv/core/etc/nix/nix.conf; ln -s ${pkgs.nix}/bin/nix-store /srv/core/usr/bin/nix-store; ln -s ${pkgs.python3}/bin/python3 /srv/core/usr/bin/python3")
+          machine.succeed("echo tc > /srv/core/etc/sysconfig/tcuser; mkdir -p /srv/core/etc/nix; printf 'substituters =\\nbuild-users-group =\\n' > /srv/core/etc/nix/nix.conf; ln -s ${
+            if bundled then
+              pkgs.writeShellScript "incompatible-nix-store" "echo incompatible; exit 1"
+            else
+              "${pkgs.nix}/bin/nix-store"
+          } /srv/core/usr/bin/nix-store; ln -s ${pkgs.python3}/bin/python3 /srv/core/usr/bin/python3")
           machine.succeed("chown -R 1001:50 /srv/core/home/tc /var/lib/tce-vm/repo")
           machine.succeed("systemctl stop dhcpcd; ip link set eth0 down")
       root="chroot /srv/core /usr/bin/env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin "

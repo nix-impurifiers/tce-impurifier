@@ -124,7 +124,9 @@ let
   '';
   makeRuntimeTcz =
     {
-      nixDependency ? "nix",
+      bundledNixStore ? null,
+      bundledNixNotices ? [ ],
+      nixDependency ? (if bundledNixStore == null then "nix" else null),
       pythonDependency ? "python3",
       version ? core.runtimeVersion,
     }:
@@ -132,15 +134,12 @@ let
       name = "tce-impurifier";
       inherit version;
       license = "MIT";
-      dependencies = [
-        nixDependency
-        pythonDependency
-      ];
+      dependencies = lib.optional (nixDependency != null) nixDependency ++ [ pythonDependency ];
       activate = true;
       requiredRuntime = version;
       payload = pkgs.runCommand "tce-impurifier-runtime" { } ''
         mkdir -p $out
-        cp -r ${core.makeRuntimeTree { }}/. $out/
+        cp -r ${core.makeRuntimeTree { inherit bundledNixStore bundledNixNotices; }}/. $out/
         chmod -R u+w $out
         install -Dm755 ${activate} $out/usr/sbin/tce-impurifier-activate
         install -Dm755 ${../src/adapter.py} $out/usr/local/bin/tce-impurifier
@@ -232,6 +231,15 @@ core
     makeBootSet
     adapter
     ;
+  makeNativeTcz =
+    args:
+    buildTcz (
+      args
+      // {
+        activate = false;
+        projectedName = null;
+      }
+    );
   runtimeTcz = makeRuntimeTcz { };
   makeNetTcz = args: makeTcz (args // { offline = false; });
   makeOfflineTcz = args: makeTcz (args // { offline = true; });
